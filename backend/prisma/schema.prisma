@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id             Int      @id @default(autoincrement())
+  nombre         String
+  apellido       String
+  email          String   @unique
+  telefono       String?
+  rol            Rol      @default(PACIENTE)
+  contraseña     String
+  fecha_creacion DateTime @default(now())
+
+  // Relación con citas (1:N)
+  citas          Cita[]
+}
+
+model Cita {
+  id             Int      @id @default(autoincrement())
+  fecha          DateTime
+  motivo         String
+  estado         EstadoCita @default(PENDIENTE)
+
+  // Relaciones
+  pacienteId     Int
+  medicoId       Int
+
+  paciente       Usuario  @relation("PacienteCitas", fields: [pacienteId], references: [id])
+  medico         Usuario  @relation("MedicoCitas", fields: [medicoId], references: [id])
+}
+
+enum Rol {
+  ADMIN
+  MEDICO
+  PACIENTE
+}
+
+enum EstadoCita {
+  PENDIENTE
+  CONFIRMADA
+  CANCELADA
+}
