@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="50" fill="#2196F3"/> <!-- Océano -->
+  <!-- Formas continentales abstractas -->
+  <path d="M20,40 Q30,25 45,30 T60,40 T50,60 T30,55 Z" fill="#81C784"/> 
+  <path d="M70,30 Q80,20 90,30 V60 Q80,70 70,60 T60,50 Z" fill="#81C784"/>
+  <path d="M30,70 Q40,65 55,75 T70,80 T60,95 T40,90 Z" fill="#81C784"/>
+</svg>

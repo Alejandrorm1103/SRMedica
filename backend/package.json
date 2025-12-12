@@ -1,10 +1,80 @@
 {
+  "name": "srmedica-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "build:clean": "rimraf dist && npm run build",
+    "start": "node dist/server.js",
+    "start:prod": "node dist/server.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"prisma/**/*.prisma\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"prisma/**/*.prisma\"",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui",
+    "type-check": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:reset": "prisma migrate reset",
+    "db:push": "prisma db push",
+    "db:pull": "prisma db pull",
+    "docker:build": "docker build -t srmedica-backend .",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "prepare": "node -e \"try { require('husky') } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') throw e }\""
+  },
   "dependencies": {
-    "@fastify/cors": "^11.1.0",
+    "@fastify/cookie": "^9.3.1",
+    "@fastify/cors": "^9.0.1",
+    "@fastify/helmet": "^11.1.1",
+    "@fastify/jwt": "^8.0.1",
+    "@fastify/rate-limit": "^9.1.0",
+    "@fastify/sensible": "^5.6.0",
+    "@fastify/swagger": "^8.14.0",
+    "@fastify/swagger-ui": "^1.10.2",
+    "@prisma/client": "5.22.0",
+    "@types/nodemailer": "^7.0.4",
     "bcrypt": "^6.0.0",
-    "fastify": "^5.6.1"
+    "dotenv": "^17.2.3",
+    "fastify": "^4.26.2",
+    "nodemailer": "^7.0.11",
+    "pg": "^8.16.3",
+    "prisma": "5.22.0",
+    "resend": "^6.5.2",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "prisma": "^6.19.0"
+    "@eslint/js": "^9.15.0",
+    "@types/bcrypt": "^6.0.0",
+    "@types/node": "^20.11.30",
+    "@types/pg": "^8.15.6",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "@vitest/ui": "^1.6.1",
+    "eslint": "^9.15.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.6.3",
+    "vitest": "^1.6.1"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,prisma}": [
+      "prettier --write"
+    ]
   }
 }

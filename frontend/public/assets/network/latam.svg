@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="50" fill="#28A7EC"/> <!-- Océano -->
+  <!-- Silueta estilizada de Latinoamérica -->
+  <path d="M30,30 Q40,10 55,25 T65,45 T60,75 L50,90 L40,80 Q20,60 25,40 T30,30 Z" fill="#4CAF50"/>
+  <!-- Pequeño detalle para el caribe/centroamérica -->
+  <circle cx="45" cy="20" r="5" fill="#4CAF50"/>
+</svg>

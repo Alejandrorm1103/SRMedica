@@ -1,48 +1,784 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+  // Trigger restart 1
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["auth", "cat", "core", "public"]
 }
 
 model Usuario {
-  id             Int      @id @default(autoincrement())
-  nombre         String
-  apellido       String
-  email          String   @unique
-  telefono       String?
-  rol            Rol      @default(PACIENTE)
-  contraseña     String
-  fecha_creacion DateTime @default(now())
+  id                       BigInt                    @id @default(autoincrement())
+  username                 String?                   @unique(map: "uq_auth_usuarios_username") @db.VarChar(256)
+  normalized_username      String?                   @unique(map: "uq_auth_usuarios_normalized_username") @db.VarChar(256)
+  email                    String                    @unique(map: "uq_auth_usuarios_email") @db.Citext
+  emailConfirmado          Boolean                   @default(false) @map("email_confirmado")
+  telefono                 String?                   @db.VarChar(30)
+  telefono_confirmado      Boolean                   @default(false)
+  passwordHash             String                    @map("password_hash")
+  securityStamp            String                    @default(dbgenerated("(gen_random_uuid())::text")) @map("security_stamp")
+  concurrency_stamp        String                    @default(dbgenerated("(gen_random_uuid())::text"))
+  two_factor_habilitado    Boolean                   @default(false)
+  lockout_habilitado       Boolean                   @default(false)
+  lockout_fin              DateTime?                 @db.Timestamptz(6)
+  intentos_fallidos        Int                       @default(0)
+  estado                   Boolean                   @default(true)
+  fechaCreacion            DateTime                  @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion       DateTime                  @default(now()) @updatedAt @map("fecha_actualizacion") @db.Timestamptz(6)
+  aceptaciones_politicas   aceptaciones_politicas[]
+  administrador            Administrador?
+  auditorias               auditorias[]
+  citas                    Cita[]
+  envios_notificaciones    EnvioNotificacion[]
+  historiales_citas        HistorialCita[]
+  medico                   Medico?
+  mensajesChat             MensajeChat[]
+  notificaciones           Notificacion[]
+  paciente                 Paciente?
+  preferenciasNotificacion PreferenciaNotificacion[]
+  tokens                   AuthToken[]
 
-  // Relación con citas (1:N)
-  citas          Cita[]
+  @@index([email], map: "idx_auth_usuarios_email")
+  @@map("usuarios")
+  @@schema("auth")
+}
+
+model Rol {
+  id                  BigInt           @id @default(autoincrement())
+  codigo              String           @unique @db.VarChar(50)
+  nombre              String           @db.VarChar(100)
+  descripcion         String?
+  estado              Boolean          @default(true)
+  fecha_creacion      DateTime         @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime         @default(now()) @db.Timestamptz(6)
+  roles_permisos      roles_permisos[]
+  users               UsuarioRol[]
+
+  @@map("roles")
+  @@schema("auth")
+}
+
+model UsuarioRol {
+  usuarioId           BigInt   @map("usuario_id")
+  rolId               BigInt   @map("rol_id")
+  fecha_creacion      DateTime @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime @default(now()) @db.Timestamptz(6)
+  rol                 Rol      @relation(fields: [rolId], references: [id], onUpdate: NoAction)
+
+  @@id([usuarioId, rolId])
+  @@map("usuarios_roles")
+  @@schema("auth")
+}
+
+model Sesion {
+  id                  BigInt   @id @default(autoincrement())
+  usuarioId           BigInt   @map("usuario_id")
+  refreshHash         String   @map("refresh_hash")
+  ip                  String?  @db.Inet
+  userAgent           String?  @map("user_agent")
+  expiraEn            DateTime @map("expira_en") @db.Timestamptz(6)
+  revocada            Boolean  @default(false)
+  fecha_creacion      DateTime @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime @default(now()) @db.Timestamptz(6)
+  sessionKey          String?  @map("session_key")
+
+  @@index([usuarioId], map: "idx_auth_sesiones_usuario")
+  @@map("sesiones")
+  @@schema("auth")
+}
+
+model Paciente {
+  id                  BigInt            @id @default(autoincrement())
+  usuarioId           BigInt            @unique @map("usuario_id")
+  tipo_documento_id   BigInt?
+  numeroDocumento     String?           @map("numero_documento") @db.VarChar(50)
+  primerNombre        String            @map("primer_nombre") @db.VarChar(60)
+  segundoNombre       String?           @map("segundo_nombre") @db.VarChar(60)
+  primerApellido      String            @map("primer_apellido") @db.VarChar(60)
+  segundoApellido     String?           @map("segundo_apellido") @db.VarChar(60)
+  fechaNacimiento     DateTime?         @map("fecha_nacimiento") @db.Date
+  sexo_id             BigInt?
+  direccionLinea1     String?           @map("direccion_linea1") @db.VarChar(150)
+  direccion_linea2    String?           @db.VarChar(150)
+  ciudad              String?           @db.VarChar(100)
+  departamento        String?           @db.VarChar(100)
+  pais                String?           @db.VarChar(100)
+  codigo_postal       String?           @db.VarChar(20)
+  estado              Boolean           @default(true)
+  fecha_creacion      DateTime          @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime          @default(now()) @db.Timestamptz(6)
+  citas               Cita[]
+  formulasMedicas     FormulaMedica[]
+  historiasClinicas   HistoriaClinica?
+  sexos               sexos?            @relation(fields: [sexo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tipos_documentos    tipos_documentos? @relation(fields: [tipo_documento_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuario             Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tipo_documento_id, numeroDocumento], map: "idx_pacientes_documento")
+  @@map("pacientes")
+  @@schema("core")
+}
+
+model Medico {
+  id                     BigInt                   @id @default(autoincrement())
+  usuarioId              BigInt                   @unique @map("usuario_id")
+  tipo_documento_id      BigInt?
+  numeroDocumento        String?                  @map("numero_documento") @db.VarChar(50)
+  primerNombre           String                   @map("primer_nombre") @db.VarChar(60)
+  segundoNombre          String?                  @map("segundo_nombre") @db.VarChar(60)
+  primerApellido         String                   @map("primer_apellido") @db.VarChar(60)
+  segundoApellido        String?                  @map("segundo_apellido") @db.VarChar(60)
+  fechaNacimiento        DateTime?                @map("fecha_nacimiento") @db.Date
+  sexo_id                BigInt?
+  direccionLinea1        String?                  @map("direccion_linea1") @db.VarChar(150)
+  direccion_linea2       String?                  @db.VarChar(150)
+  ciudad                 String?                  @db.VarChar(100)
+  departamento           String?                  @db.VarChar(100)
+  pais                   String?                  @db.VarChar(100)
+  codigo_postal          String?                  @db.VarChar(20)
+  registroProfesional    String                   @unique(map: "uq_medicos_registro_profesional") @map("registro_profesional") @db.VarChar(80)
+  resumenPerfil          String?                  @map("resumen_perfil")
+  estado                 Boolean                  @default(true)
+  fecha_creacion         DateTime                 @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion    DateTime                 @default(now()) @db.Timestamptz(6)
+  archivos_clinicos      archivos_clinicos[]
+  citas                  Cita[]
+  consultasMedicas       ConsultaMedica[]
+  formulasMedicas        FormulaMedica[]
+  horarios               HorarioMedico[]
+  sexos                  sexos?                   @relation(fields: [sexo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tipos_documentos       tipos_documentos?        @relation(fields: [tipo_documento_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuario                Usuario                  @relation(fields: [usuarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  especialidades         MedicoEspecialidad[]
+  notasEvolucion         NotaEvolucion[]
+  verificaciones_medicas verificaciones_medicas[]
+
+  @@index([tipo_documento_id, numeroDocumento], map: "idx_medicos_documento")
+  @@map("medicos")
+  @@schema("core")
+}
+
+model Administrador {
+  id                  BigInt            @id @default(autoincrement())
+  usuarioId           BigInt            @unique @map("usuario_id")
+  tipoDocumentoId     BigInt?           @map("tipo_documento_id")
+  numeroDocumento     String?           @map("numero_documento") @db.VarChar(50)
+  primerNombre        String            @map("primer_nombre") @db.VarChar(60)
+  segundoNombre       String?           @map("segundo_nombre") @db.VarChar(60)
+  primerApellido      String            @map("primer_apellido") @db.VarChar(60)
+  segundoApellido     String?           @map("segundo_apellido") @db.VarChar(60)
+  fechaNacimiento     DateTime?         @map("fecha_nacimiento") @db.Date
+  sexoId              BigInt?           @map("sexo_id")
+  direccionLinea1     String?           @map("direccion_linea1") @db.VarChar(150)
+  direccionLinea2     String?           @map("direccion_linea2") @db.VarChar(150)
+  ciudad              String?           @db.VarChar(100)
+  departamento        String?           @db.VarChar(100)
+  pais                String?           @db.VarChar(100)
+  codigoPostal        String?           @map("codigo_postal") @db.VarChar(20)
+  estado              Boolean           @default(true)
+  fechaCreacion       DateTime          @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion  DateTime          @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  sexos               sexos?            @relation(fields: [sexoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tiposDocumentos     tipos_documentos? @relation(fields: [tipoDocumentoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuario             Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tipoDocumentoId, numeroDocumento], map: "idx_administradores_documento")
+  @@map("administradores")
+  @@schema("core")
+}
+
+model Especialidad {
+  id                  BigInt               @id @default(autoincrement())
+  codigo              String               @unique @db.VarChar(50)
+  nombre              String               @db.VarChar(150)
+  descripcion         String?
+  estado              Boolean              @default(true)
+  fecha_creacion      DateTime             @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime             @default(now()) @db.Timestamptz(6)
+  medicos             MedicoEspecialidad[]
+
+  @@map("especialidades")
+  @@schema("cat")
+}
+
+model MedicoEspecialidad {
+  medicoId            BigInt       @map("medico_id")
+  especialidadId      BigInt       @map("especialidad_id")
+  fecha_creacion      DateTime     @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime     @default(now()) @db.Timestamptz(6)
+  especialidad        Especialidad @relation(fields: [especialidadId], references: [id], onUpdate: NoAction)
+  medico              Medico       @relation(fields: [medicoId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([medicoId, especialidadId])
+  @@map("medicos_especialidades")
+  @@schema("core")
+}
+
+model HorarioMedico {
+  id                  BigInt   @id @default(autoincrement())
+  medicoId            BigInt   @map("medico_id")
+  diaSemana           Int      @map("dia_semana") @db.SmallInt
+  horaInicio          DateTime @map("hora_inicio") @db.Time
+  horaFin             DateTime @map("hora_fin") @db.Time
+  estado              Boolean  @default(true)
+  fecha_creacion      DateTime @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime @default(now()) @db.Timestamptz(6)
+  medico              Medico   @relation(fields: [medicoId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([medicoId, diaSemana], map: "idx_horarios_medicos_medico")
+  @@map("horarios_medicos")
+  @@schema("core")
 }
 
 model Cita {
-  id             Int      @id @default(autoincrement())
-  fecha          DateTime
-  motivo         String
-  estado         EstadoCita @default(PENDIENTE)
+  id                    BigInt                 @id @default(autoincrement())
+  pacienteId            BigInt                 @map("paciente_id")
+  medicoId              BigInt                 @map("medico_id")
+  estadoCitaId          BigInt                 @map("estado_cita_id")
+  inicio                DateTime               @db.Timestamptz(6)
+  fin                   DateTime               @db.Timestamptz(6)
+  enlace_video          String?
+  motivo                String?
+  motivoCancelacionId   BigInt?                @map("motivo_cancelacion_id")
+  canceladaPorUsuarioId BigInt?                @map("cancelada_por_usuario_id")
+  estado                Boolean                @default(true)
+  fecha_creacion        DateTime               @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion   DateTime               @default(now()) @db.Timestamptz(6)
+  chat                  ChatCita?
+  usuarios              Usuario?               @relation(fields: [canceladaPorUsuarioId], references: [id], onUpdate: NoAction)
+  estadoCita            EstadoCita             @relation(fields: [estadoCitaId], references: [id], onUpdate: NoAction)
+  medico                Medico                 @relation(fields: [medicoId], references: [id], onUpdate: NoAction)
+  motivoCancelacion     MotivoCancelacionCita? @relation(fields: [motivoCancelacionId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  paciente              Paciente               @relation(fields: [pacienteId], references: [id], onUpdate: NoAction)
+  consultaMedica        ConsultaMedica?
+  historiales           HistorialCita[]
+  notificaciones        Notificacion[]
+  videollamadas         VideollamadaCita[]
 
-  // Relaciones
-  pacienteId     Int
-  medicoId       Int
-
-  paciente       Usuario  @relation("PacienteCitas", fields: [pacienteId], references: [id])
-  medico         Usuario  @relation("MedicoCitas", fields: [medicoId], references: [id])
+  @@index([estadoCitaId], map: "idx_citas_estado")
+  @@index([medicoId, inicio], map: "idx_citas_medico_inicio")
+  @@index([pacienteId, inicio], map: "idx_citas_paciente_inicio")
+  @@map("citas")
+  @@schema("core")
 }
 
-enum Rol {
-  ADMIN
-  MEDICO
-  PACIENTE
+model HistorialCita {
+  id                   BigInt      @id @default(autoincrement())
+  citaId               BigInt      @map("cita_id")
+  estadoAnteriorId     BigInt?     @map("estado_anterior_id")
+  estadoNuevoId        BigInt      @map("estado_nuevo_id")
+  cambiadoPorUsuarioId BigInt      @map("cambiado_por_usuario_id")
+  motivo               String?
+  estado               Boolean     @default(true)
+  fechaCreacion        DateTime    @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fecha_actualizacion  DateTime    @default(now()) @db.Timestamptz(6)
+  usuarios             Usuario     @relation(fields: [cambiadoPorUsuarioId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cita                 Cita        @relation(fields: [citaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  estadoAnterior       EstadoCita? @relation("EstadoAnterior", fields: [estadoAnteriorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  estadoNuevo          EstadoCita  @relation("EstadoNuevo", fields: [estadoNuevoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([citaId, fechaCreacion(sort: Desc)], map: "idx_historiales_citas_cita")
+  @@map("historiales_citas")
+  @@schema("core")
 }
 
-enum EstadoCita {
-  PENDIENTE
-  CONFIRMADA
-  CANCELADA
+model EstadoCita {
+  id                    BigInt          @id @default(autoincrement())
+  codigo                String          @unique @db.VarChar(50)
+  nombre                String          @db.VarChar(120)
+  descripcion           String?
+  estado                Boolean         @default(true)
+  fecha_creacion        DateTime        @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion   DateTime        @default(now()) @db.Timestamptz(6)
+  citas                 Cita[]
+  historialesAnteriores HistorialCita[] @relation("EstadoAnterior")
+  historialesNuevos     HistorialCita[] @relation("EstadoNuevo")
+
+  @@map("estados_citas")
+  @@schema("cat")
+}
+
+model MotivoCancelacionCita {
+  id                  BigInt   @id @default(autoincrement())
+  codigo              String   @unique @db.VarChar(50)
+  nombre              String   @db.VarChar(200)
+  descripcion         String?
+  estado              Boolean  @default(true)
+  fecha_creacion      DateTime @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime @default(now()) @db.Timestamptz(6)
+  citas               Cita[]
+
+  @@map("motivos_cancelaciones_citas")
+  @@schema("cat")
+}
+
+model AuthToken {
+  id             BigInt   @id @default(autoincrement())
+  usuarioId      BigInt   @map("usuario_id")
+  tipo           String   @db.VarChar(40)
+  tokenKey       String   @map("token_key")
+  tokenHash      String   @map("token_hash")
+  expiraEn       DateTime @map("expira_en") @db.Timestamptz(6)
+  usado          Boolean  @default(false)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz(6)
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("auth_tokens")
+  @@schema("auth")
+}
+
+model ChatCita {
+  id                  BigInt        @id @default(autoincrement())
+  citaId              BigInt        @unique @map("cita_id")
+  estado              Boolean       @default(true)
+  fecha_creacion      DateTime      @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime      @default(now()) @db.Timestamptz(6)
+  cita                Cita          @relation(fields: [citaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  mensajes            MensajeChat[]
+
+  @@map("chats_citas")
+  @@schema("core")
+}
+
+model MensajeChat {
+  id                  BigInt              @id @default(autoincrement())
+  chatCitaId          BigInt              @map("chat_cita_id")
+  remitenteUsuarioId  BigInt              @map("remitente_usuario_id")
+  contenido           String?
+  estado              Boolean             @default(true)
+  fechaCreacion       DateTime            @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fecha_actualizacion DateTime            @default(now()) @db.Timestamptz(6)
+  mensajes_archivos   mensajes_archivos[]
+  chat                ChatCita            @relation(fields: [chatCitaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  remitente           Usuario             @relation(fields: [remitenteUsuarioId], references: [id], onUpdate: NoAction)
+
+  @@index([chatCitaId, fechaCreacion], map: "idx_mensajes_chat_chat")
+  @@map("mensajes_chat")
+  @@schema("core")
+}
+
+model HistoriaClinica {
+  id                  BigInt              @id @default(autoincrement())
+  pacienteId          BigInt              @unique @map("paciente_id")
+  numeroHistoria      String?             @map("numero_historia") @db.VarChar(60)
+  estado              Boolean             @default(true)
+  fecha_creacion      DateTime            @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime            @default(now()) @db.Timestamptz(6)
+  archivos_clinicos   archivos_clinicos[]
+  consultas           ConsultaMedica[]
+  paciente            Paciente            @relation(fields: [pacienteId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("historias_clinicas")
+  @@schema("core")
+}
+
+model ConsultaMedica {
+  id                  BigInt              @id @default(autoincrement())
+  historiaClinicaId   BigInt              @map("historia_clinica_id")
+  citaId              BigInt              @unique @map("cita_id")
+  medicoId            BigInt              @map("medico_id")
+  motivo_consulta     String?
+  inicio              DateTime            @default(now()) @db.Timestamptz(6)
+  fin                 DateTime?           @db.Timestamptz(6)
+  estado              Boolean             @default(true)
+  fecha_creacion      DateTime            @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime            @default(now()) @db.Timestamptz(6)
+  archivos_clinicos   archivos_clinicos[]
+  cita                Cita                @relation(fields: [citaId], references: [id], onUpdate: NoAction)
+  historia            HistoriaClinica     @relation(fields: [historiaClinicaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  medico              Medico              @relation(fields: [medicoId], references: [id], onUpdate: NoAction)
+  examenes_medicos    examenes_medicos[]
+  formulas            FormulaMedica[]
+  notas               NotaEvolucion[]
+
+  @@index([historiaClinicaId, inicio(sort: Desc)], map: "idx_consultas_historia")
+  @@map("consultas_medicas")
+  @@schema("core")
+}
+
+model NotaEvolucion {
+  id                  BigInt         @id @default(autoincrement())
+  consultaMedicaId    BigInt         @map("consulta_medica_id")
+  autorMedicoId       BigInt         @map("autor_medico_id")
+  contenido           String
+  estado              Boolean        @default(true)
+  fechaCreacion       DateTime       @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fecha_actualizacion DateTime       @default(now()) @db.Timestamptz(6)
+  autor               Medico         @relation(fields: [autorMedicoId], references: [id], onUpdate: NoAction)
+  consulta            ConsultaMedica @relation(fields: [consultaMedicaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([consultaMedicaId, fechaCreacion(sort: Desc)], map: "idx_notas_consulta")
+  @@map("notas_evolucion")
+  @@schema("core")
+}
+
+model FormulaMedica {
+  id                  BigInt                 @id @default(autoincrement())
+  consultaMedicaId    BigInt                 @map("consulta_medica_id")
+  medicoId            BigInt                 @map("medico_id")
+  pacienteId          BigInt                 @map("paciente_id")
+  indicaciones        String?
+  estado              Boolean                @default(true)
+  fecha_creacion      DateTime               @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime               @default(now()) @db.Timestamptz(6)
+  consulta            ConsultaMedica         @relation(fields: [consultaMedicaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  medico              Medico                 @relation(fields: [medicoId], references: [id], onUpdate: NoAction)
+  paciente            Paciente               @relation(fields: [pacienteId], references: [id], onUpdate: NoAction)
+  detalles            FormulaMedicaDetalle[]
+
+  @@map("formulas_medicas")
+  @@schema("core")
+}
+
+model FormulaMedicaDetalle {
+  id                  BigInt        @id @default(autoincrement())
+  formulaMedicaId     BigInt        @map("formula_medica_id")
+  medicamento         String        @db.VarChar(200)
+  dosis               String        @db.VarChar(100)
+  frecuencia          String        @db.VarChar(100)
+  duracion            String?       @db.VarChar(100)
+  indicacion_texto    String?
+  estado              Boolean       @default(true)
+  fecha_creacion      DateTime      @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime      @default(now()) @db.Timestamptz(6)
+  formula             FormulaMedica @relation(fields: [formulaMedicaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([formulaMedicaId], map: "idx_detalles_formula")
+  @@map("formulas_medicas_detalles")
+  @@schema("core")
+}
+
+model Notificacion {
+  id                  BigInt              @id @default(autoincrement())
+  usuarioId           BigInt              @map("usuario_id")
+  citaId              BigInt?             @map("cita_id")
+  tipo                String              @db.VarChar(80)
+  payload             Json?
+  estado              Boolean             @default(true)
+  fechaCreacion       DateTime            @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fecha_actualizacion DateTime            @default(now()) @db.Timestamptz(6)
+  envios              EnvioNotificacion[]
+  cita                Cita?               @relation(fields: [citaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuario             Usuario             @relation(fields: [usuarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([usuarioId, fechaCreacion(sort: Desc)], map: "idx_notif_usuario")
+  @@map("notificaciones")
+  @@schema("core")
+}
+
+model TipoComunicacion {
+  id                  BigInt             @id @default(autoincrement())
+  codigo              String             @unique @db.VarChar(50)
+  nombre              String             @db.VarChar(120)
+  descripcion         String?
+  estado              Boolean            @default(true)
+  fecha_creacion      DateTime           @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime           @default(now()) @db.Timestamptz(6)
+  videollamadas       VideollamadaCita[]
+
+  @@map("tipos_comunicaciones")
+  @@schema("cat")
+}
+
+model VideollamadaCita {
+  id                  BigInt           @id @default(autoincrement())
+  citaId              BigInt           @map("cita_id")
+  tipoComunicacionId  BigInt           @map("tipo_comunicacion_id")
+  proveedor           String?          @db.VarChar(80)
+  urlSala             String           @map("url_sala")
+  estadoSesion        String           @default("programada") @map("estado_sesion") @db.VarChar(30)
+  inicio              DateTime?        @db.Timestamptz(6)
+  fin                 DateTime?        @db.Timestamptz(6)
+  estado              Boolean          @default(true)
+  fechaCreacion       DateTime         @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fecha_actualizacion DateTime         @default(now()) @db.Timestamptz(6)
+  cita                Cita             @relation(fields: [citaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tipoComunicacion    TipoComunicacion @relation(fields: [tipoComunicacionId], references: [id], onUpdate: NoAction)
+
+  @@index([citaId, inicio], map: "idx_video_cita")
+  @@map("videollamadas_citas")
+  @@schema("core")
+}
+
+model PreferenciaNotificacion {
+  id                     BigInt                 @id @default(autoincrement())
+  usuarioId              BigInt                 @map("usuario_id")
+  canalId                BigInt                 @map("canal_id")
+  habilitado             Boolean                @default(true)
+  estado                 Boolean                @default(true)
+  fecha_creacion         DateTime               @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion    DateTime               @default(now()) @db.Timestamptz(6)
+  canales_notificaciones canales_notificaciones @relation(fields: [canalId], references: [id], onUpdate: NoAction)
+  usuario                Usuario                @relation(fields: [usuarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([usuarioId, canalId])
+  @@map("preferencias_notificaciones")
+  @@schema("core")
+}
+
+model EnvioNotificacion {
+  id                      BigInt                 @id @default(autoincrement())
+  notificacionId          BigInt                 @map("notificacion_id")
+  canalId                 BigInt                 @map("canal_id")
+  destinatario_usuario_id BigInt
+  estadoEnvio             String                 @map("estado_envio") @db.VarChar(30)
+  intentos                Int                    @default(0) @db.SmallInt
+  ultimo_error            String?
+  estado                  Boolean                @default(true)
+  fechaCreacion           DateTime               @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fecha_actualizacion     DateTime               @default(now()) @db.Timestamptz(6)
+  canales_notificaciones  canales_notificaciones @relation(fields: [canalId], references: [id], onUpdate: NoAction)
+  usuarios                Usuario                @relation(fields: [destinatario_usuario_id], references: [id], onUpdate: NoAction)
+  notificacion            Notificacion           @relation(fields: [notificacionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([destinatario_usuario_id, estadoEnvio], map: "idx_envios_dest")
+  @@map("envios_notificaciones")
+  @@schema("core")
+}
+
+model permisos {
+  id                  BigInt           @id @default(autoincrement())
+  codigo              String           @unique @db.VarChar(80)
+  nombre              String           @db.VarChar(150)
+  descripcion         String?
+  estado              Boolean          @default(true)
+  fecha_creacion      DateTime         @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime         @default(now()) @db.Timestamptz(6)
+  roles_permisos      roles_permisos[]
+
+  @@schema("auth")
+}
+
+model roles_permisos {
+  rol_id              BigInt
+  permiso_id          BigInt
+  fecha_creacion      DateTime @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime @default(now()) @db.Timestamptz(6)
+  permisos            permisos @relation(fields: [permiso_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roles               Rol      @relation(fields: [rol_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([rol_id, permiso_id])
+  @@schema("auth")
+}
+
+model canales_notificaciones {
+  id                          BigInt                    @id @default(autoincrement())
+  codigo                      String                    @unique @db.VarChar(50)
+  nombre                      String                    @db.VarChar(120)
+  descripcion                 String?
+  estado                      Boolean                   @default(true)
+  fecha_creacion              DateTime                  @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion         DateTime                  @default(now()) @db.Timestamptz(6)
+  envios_notificaciones       EnvioNotificacion[]
+  preferencias_notificaciones PreferenciaNotificacion[]
+
+  @@schema("cat")
+}
+
+model sexos {
+  id                  BigInt          @id @default(autoincrement())
+  codigo              String          @unique @db.VarChar(20)
+  nombre              String          @db.VarChar(60)
+  descripcion         String?
+  estado              Boolean         @default(true)
+  fecha_creacion      DateTime        @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime        @default(now()) @db.Timestamptz(6)
+  administradores     Administrador[]
+  medicos             Medico[]
+  pacientes           Paciente[]
+
+  @@schema("cat")
+}
+
+model tipos_documentos {
+  id                  BigInt          @id @default(autoincrement())
+  codigo              String          @unique @db.VarChar(20)
+  nombre              String          @db.VarChar(80)
+  descripcion         String?
+  estado              Boolean         @default(true)
+  fecha_creacion      DateTime        @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime        @default(now()) @db.Timestamptz(6)
+  administradores     Administrador[]
+  medicos             Medico[]
+  pacientes           Paciente[]
+
+  @@schema("cat")
+}
+
+model tipos_documentos_clinicos {
+  id                        BigInt                      @id @default(autoincrement())
+  codigo                    String                      @unique @db.VarChar(50)
+  nombre                    String                      @db.VarChar(120)
+  descripcion               String?
+  estado                    Boolean                     @default(true)
+  fecha_creacion            DateTime                    @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion       DateTime                    @default(now()) @db.Timestamptz(6)
+  archivos_clinicos         archivos_clinicos[]
+  examenes_resultados       examenes_resultados[]
+  mensajes_archivos         mensajes_archivos[]
+  verificaciones_documentos verificaciones_documentos[]
+
+  @@schema("cat")
+}
+
+model tipos_examenes_medicos {
+  id                  BigInt             @id @default(autoincrement())
+  codigo              String             @unique @db.VarChar(50)
+  nombre              String             @db.VarChar(150)
+  descripcion         String?
+  estado              Boolean            @default(true)
+  fecha_creacion      DateTime           @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime           @default(now()) @db.Timestamptz(6)
+  examenes_medicos    examenes_medicos[]
+
+  @@schema("cat")
+}
+
+model aceptaciones_politicas {
+  id                  BigInt   @id @default(autoincrement())
+  usuario_id          BigInt
+  codigo_politica     String   @db.VarChar(60)
+  version             String   @db.VarChar(40)
+  aceptado            Boolean  @default(true)
+  ip                  String?  @db.Inet
+  user_agent          String?
+  estado              Boolean  @default(true)
+  fecha_creacion      DateTime @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime @default(now()) @db.Timestamptz(6)
+  usuarios            Usuario  @relation(fields: [usuario_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([usuario_id, codigo_politica, version])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model archivos_clinicos {
+  id                        BigInt                    @id @default(autoincrement())
+  historia_clinica_id       BigInt
+  consulta_medica_id        BigInt?
+  tipo_documento_clinico_id BigInt
+  nombre_archivo            String
+  mime_type                 String                    @db.VarChar(120)
+  tamano_bytes              BigInt
+  url_archivo               String
+  hash_contenido            String?
+  subido_por_medico_id      BigInt?
+  estado                    Boolean                   @default(true)
+  fecha_creacion            DateTime                  @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion       DateTime                  @default(now()) @db.Timestamptz(6)
+  consultas_medicas         ConsultaMedica?           @relation(fields: [consulta_medica_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  historias_clinicas        HistoriaClinica           @relation(fields: [historia_clinica_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  medicos                   Medico?                   @relation(fields: [subido_por_medico_id], references: [id], onUpdate: NoAction)
+  tipos_documentos_clinicos tipos_documentos_clinicos @relation(fields: [tipo_documento_clinico_id], references: [id], onUpdate: NoAction)
+
+  @@index([consulta_medica_id], map: "idx_archivos_consulta")
+  @@index([historia_clinica_id], map: "idx_archivos_historia")
+  @@schema("core")
+}
+
+model auditorias {
+  id                  BigInt   @id @default(autoincrement())
+  usuario_id          BigInt?
+  entidad             String   @db.VarChar(120)
+  entidad_id          BigInt?
+  accion              String   @db.VarChar(30)
+  dif_json            Json?
+  ip                  String?  @db.Inet
+  user_agent          String?
+  estado              Boolean  @default(true)
+  fecha_creacion      DateTime @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion DateTime @default(now()) @db.Timestamptz(6)
+  usuarios            Usuario? @relation(fields: [usuario_id], references: [id], onUpdate: NoAction)
+
+  @@index([entidad, entidad_id], map: "idx_aud_entidad")
+  @@schema("core")
+}
+
+model examenes_medicos {
+  id                     BigInt                 @id @default(autoincrement())
+  consulta_medica_id     BigInt
+  tipo_examen_id         BigInt
+  indicacion_clinica     String?
+  estado                 Boolean                @default(true)
+  fecha_creacion         DateTime               @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion    DateTime               @default(now()) @db.Timestamptz(6)
+  consultas_medicas      ConsultaMedica         @relation(fields: [consulta_medica_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tipos_examenes_medicos tipos_examenes_medicos @relation(fields: [tipo_examen_id], references: [id], onUpdate: NoAction)
+  examenes_resultados    examenes_resultados[]
+
+  @@index([consulta_medica_id], map: "idx_examenes_consulta")
+  @@schema("core")
+}
+
+model examenes_resultados {
+  id                        BigInt                     @id @default(autoincrement())
+  examen_medico_id          BigInt
+  tipo_documento_clinico_id BigInt?
+  resultado_texto           String?
+  url_archivo               String?
+  estado                    Boolean                    @default(true)
+  fecha_creacion            DateTime                   @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion       DateTime                   @default(now()) @db.Timestamptz(6)
+  examenes_medicos          examenes_medicos           @relation(fields: [examen_medico_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tipos_documentos_clinicos tipos_documentos_clinicos? @relation(fields: [tipo_documento_clinico_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([examen_medico_id], map: "idx_resultados_examen")
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mensajes_archivos {
+  id                        BigInt                    @id @default(autoincrement())
+  mensaje_chat_id           BigInt
+  tipo_documento_clinico_id BigInt
+  nombre_archivo            String
+  mime_type                 String                    @db.VarChar(120)
+  tamano_bytes              BigInt
+  url_archivo               String
+  hash_contenido            String?
+  estado                    Boolean                   @default(true)
+  fecha_creacion            DateTime                  @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion       DateTime                  @default(now()) @db.Timestamptz(6)
+  mensajes_chat             MensajeChat               @relation(fields: [mensaje_chat_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tipos_documentos_clinicos tipos_documentos_clinicos @relation(fields: [tipo_documento_clinico_id], references: [id], onUpdate: NoAction)
+
+  @@index([mensaje_chat_id], map: "idx_mensajes_archivos_msg")
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model verificaciones_documentos {
+  id                        BigInt                    @id @default(autoincrement())
+  verificacion_medica_id    BigInt
+  tipo_documento_clinico_id BigInt
+  nombre_archivo            String
+  mime_type                 String                    @db.VarChar(120)
+  tamano_bytes              BigInt
+  url_archivo               String
+  estado                    Boolean                   @default(true)
+  fecha_creacion            DateTime                  @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion       DateTime                  @default(now()) @db.Timestamptz(6)
+  tipos_documentos_clinicos tipos_documentos_clinicos @relation(fields: [tipo_documento_clinico_id], references: [id], onUpdate: NoAction)
+  verificaciones_medicas    verificaciones_medicas    @relation(fields: [verificacion_medica_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model verificaciones_medicas {
+  id                        BigInt                      @id @default(autoincrement())
+  medico_id                 BigInt
+  estado_verificacion       String                      @db.VarChar(20)
+  observaciones             String?
+  estado                    Boolean                     @default(true)
+  fecha_creacion            DateTime                    @default(now()) @db.Timestamptz(6)
+  fecha_actualizacion       DateTime                    @default(now()) @db.Timestamptz(6)
+  verificaciones_documentos verificaciones_documentos[]
+  medicos                   Medico                      @relation(fields: [medico_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([medico_id, fecha_creacion(sort: Desc)], map: "idx_verif_medico")
+  @@schema("core")
 }
