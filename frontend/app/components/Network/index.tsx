@@ -9,24 +9,24 @@ interface datatype {
 
 const Aboutdata: datatype[] = [
   {
-    imgSrc: getImagePath("/assets/network/bangladesh.svg"),
-    country: "Bangladesh",
-    paragraph: "Event madness gathering innoies, & tech enthusiasts in Speced.",
+    imgSrc: getImagePath("/assets/network/colombia.svg"),
+    country: "Colombia",
+    paragraph: "País fundador del proyecto con numerosa cantidad de población que migra a otros países.",
+  },
+  {
+    imgSrc: getImagePath("/assets/network/españa.svg"),
+    country: "España",
+    paragraph: "País con una gran población de migrantes latinos.",
   },
   {
     imgSrc: getImagePath("/assets/network/america.svg"),
-    country: "United States",
-    paragraph: "Event madness gathering innoies, & tech enthusiasts in Speced.",
+    country: "Estados Unidos",
+    paragraph: "País con una gran población de migrantes latinos.",
   },
   {
-    imgSrc: getImagePath("/assets/network/australia.svg"),
-    country: "Australia",
-    paragraph: "Event madness gathering innoies, & tech enthusiasts in Speced.",
-  },
-  {
-    imgSrc: getImagePath("/assets/network/china.svg"),
-    country: "China",
-    paragraph: "Event madness gathering innoies, & tech enthusiasts in Speced.",
+    imgSrc: getImagePath("/assets/network/mex.svg"),
+    country: "México",
+    paragraph: "País con gran población de migrantes.",
   },
 ];
 
@@ -35,7 +35,7 @@ const Network = () => {
     <div className="bg-babyblue" id="project">
       <div className="mx-auto max-w-2xl py-20 px-4 sm:px-6 lg:max-w-7xl lg:px-8">
         <h3 className="text-4xl sm:text-6xl font-semibold text-center my-10 lh-81">
-          Our network & world <br /> work details.
+          Nuestra meta es <br /> llegar a cada rincón del mundo.
         </h3>
 
         <Image

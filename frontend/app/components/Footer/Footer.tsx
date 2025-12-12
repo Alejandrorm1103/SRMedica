@@ -12,11 +12,7 @@ interface ProductType {
 const products: ProductType[] = [
   {
     id: 1,
-    link: ["Home", "Popular", "About", "Contact"],
-  },
-  {
-    id: 2,
-    link: ["Help", "Resources", "Application", "Team"],
+    link: ["Inicio", "Servicios", "Nosotros"],
   },
 ];
 
@@ -29,7 +25,7 @@ const footer = () => {
 
           <div className="col-span-4 md:col-span-12 lg:col-span-4">
             <img
-              src={getImagePath("/assets/footer/logo.svg")}
+              src={getImagePath("/assets/footer/logo.png")}
               alt="logo"
               className="pb-8"
             />
@@ -106,7 +102,7 @@ const footer = () => {
                 height={24}
               />
               <h5 className="text-base font-normal text-offwhite">
-                925 Filbert Street Pennsylvania 18072
+                Bogotá D.C Colombia
               </h5>
             </div>
             <div className="flex gap-2 mt-10">
@@ -117,7 +113,7 @@ const footer = () => {
                 height={24}
               />
               <h5 className="text-base font-normal text-offwhite">
-                + 45 34 11 44 11
+                + 34123456789
               </h5>
             </div>
             <div className="flex gap-2 mt-10">
@@ -128,7 +124,7 @@ const footer = () => {
                 height={24}
               />
               <h5 className="text-base font-normal text-offwhite">
-                info@gmail.com
+                infor@srmedica.com
               </h5>
             </div>
           </div>
@@ -139,13 +135,13 @@ const footer = () => {
         <div className="py-10 lg:flex items-center justify-between border-t border-t-bordertop">
           <h4 className="text-offwhite text-sm text-center lg:text-start font-normal">
             @2025 Agency. All Rights Reserved by{" "}
-            <Link href="https://getnextjstemplates.com/" target="_blank">
+            <Link href="" target="_blank">
               {" "}
-              GetNextjsTemplates.
+              Srmedica.
             </Link>{" "}
             Distributed by{" "}
             <Link href="https://themewagon.com/" target="_blank">
-              ThemeWagon
+              Srmedica Team
             </Link>
           </h4>
 
